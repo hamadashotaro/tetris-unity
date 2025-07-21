@@ -1,3 +1,4 @@
+using System.Net;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -12,9 +13,23 @@ public class Piece : MonoBehaviour
     public float stepDelay = 1f;
     public float lockDelay = 0.5f;
 
+    // TETRIS ARR AND DAS VARIABLES
+    private bool isDirectionKeyHeld = false;
+    private float dasTimer;
+    private float arrTimer;
+    private bool dasCompleted;
+    private Vector2 lastInput = Vector2.zero;
+
+    // default puyo tetris 2 value
+    // source: https://www.terasol.co.jp/%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0/6892
+    public float arrMs = 33f;
+    public float dasMs = 183f;
+    public float arrSeconds;
+    public float dasSeconds;
+
     private float stepTime;
     private float lockTime;
-    
+
     InputAction moveAction;
     InputAction hardDropAction;
     InputAction rotateAction;
@@ -27,12 +42,15 @@ public class Piece : MonoBehaviour
         rotationIndex = 0;
         stepTime = Time.time + stepDelay;
         lockTime = 0f;
-        
+
+        arrSeconds = arrMs / 1000f;
+        dasSeconds = dasMs / 1000f;
+
         if (cells == null)
             cells = new Vector3Int[data.cells.Length];
-        
+
         for (int i = 0; i < data.cells.Length; i++)
-            cells[i] = (Vector3Int) data.cells[i];
+            cells[i] = (Vector3Int)data.cells[i];
     }
 
     private void Start()
@@ -45,27 +63,78 @@ public class Piece : MonoBehaviour
     private void Update()
     {
         board.Clear(this);
-        
         lockTime += Time.deltaTime;
-        
-        if (moveAction.WasPressedThisFrame())
+
+        Vector2 moveValue = moveAction.ReadValue<Vector2>();
+
+// Detect direction switch or new press
+        bool directionChanged = moveValue.x != 0 && moveValue.x != lastInput.x;
+
+        if (directionChanged || moveAction.WasPressedThisFrame())
         {
-            Vector2 moveValue = moveAction.ReadValue<Vector2>();
-            
             if (moveValue.x < 0)
             {
                 Move(Vector2Int.left);
+                lastInput = Vector2.left;
             }
             else if (moveValue.x > 0)
             {
                 Move(Vector2Int.right);
+                lastInput = Vector2.right;
             }
-            
+
             if (moveValue.y < 0)
             {
                 Move(Vector2Int.down);
+                lastInput = Vector2.down;
+            }
+
+            // Reset DAS/ARR after immediate move
+            dasTimer = 0f;
+            arrTimer = 0f;
+            dasCompleted = false;
+            isDirectionKeyHeld = true;
+
+            board.Set(this);
+        }
+
+// Handle release
+        if (moveValue.x == 0 && lastInput.x != 0)
+        {
+            lastInput = Vector2.zero;
+            dasTimer = 0f;
+            arrTimer = 0f;
+            dasCompleted = false;
+            isDirectionKeyHeld = false;
+        }
+
+
+// DAS/ARR logic
+        if (isDirectionKeyHeld && lastInput.x != 0)
+        {
+            if (!dasCompleted)
+            {
+                dasTimer += Time.deltaTime;
+                if (dasTimer >= dasSeconds)
+                {
+                    dasCompleted = true;
+                    arrTimer = arrSeconds; // trigger first repeat immediately
+                }
+            }
+            else
+            {
+                arrTimer += Time.deltaTime;
+                if (arrTimer >= arrSeconds)
+                {
+                    bool moved = Move(Vector2Int.RoundToInt(lastInput));
+                    if (moved)
+                    {
+                        arrTimer = 0f;
+                    }
+                }
             }
         }
+
 
         if (hardDropAction.WasPressedThisFrame())
         {
@@ -86,7 +155,7 @@ public class Piece : MonoBehaviour
         {
             Step();
         }
-        
+
         board.Set(this);
     }
 
@@ -111,10 +180,10 @@ public class Piece : MonoBehaviour
         {
             continue;
         }
-        
+
         Lock();
     }
-    
+
     private void Rotate(int value)
     {
         int originalRotation = rotationIndex;
@@ -137,19 +206,24 @@ public class Piece : MonoBehaviour
             int y;
             switch (data.tetromino)
             {
-                case(Tetromino.I):
-                case(Tetromino.O):
+                case (Tetromino.I):
+                case (Tetromino.O):
                     cell.x -= 0.5f;
                     cell.y -= 0.5f;
-                    x = Mathf.CeilToInt((cell.x * Data.RotationMatrix[0] * value) + (cell.y * Data.RotationMatrix[1] * value));
-                    y = Mathf.CeilToInt((cell.x * Data.RotationMatrix[2] * value) + (cell.y * Data.RotationMatrix[3] * value));
+                    x = Mathf.CeilToInt((cell.x * Data.RotationMatrix[0] * value) +
+                                        (cell.y * Data.RotationMatrix[1] * value));
+                    y = Mathf.CeilToInt((cell.x * Data.RotationMatrix[2] * value) +
+                                        (cell.y * Data.RotationMatrix[3] * value));
                     break;
-                
+
                 default:
-                    x = Mathf.RoundToInt((cell.x * Data.RotationMatrix[0] * value) + (cell.y * Data.RotationMatrix[1] * value));
-                    y = Mathf.RoundToInt((cell.x * Data.RotationMatrix[2] * value) + (cell.y * Data.RotationMatrix[3] * value));
+                    x = Mathf.RoundToInt((cell.x * Data.RotationMatrix[0] * value) +
+                                         (cell.y * Data.RotationMatrix[1] * value));
+                    y = Mathf.RoundToInt((cell.x * Data.RotationMatrix[2] * value) +
+                                         (cell.y * Data.RotationMatrix[3] * value));
                     break;
             }
+
             cells[i] = new Vector3Int(x, y, 0);
         }
     }
@@ -160,7 +234,7 @@ public class Piece : MonoBehaviour
             return max - (min - input) % (max - min);
         else
             return min + (input - min) % (max - min);
-     }
+    }
 
     private bool TestWallKicks(int rotationIndex, int rotationDirection)
     {
@@ -186,18 +260,16 @@ public class Piece : MonoBehaviour
 
     private bool Move(Vector2Int translation)
     {
-        Vector3Int newPosition = position;
-        newPosition.x += translation.x;
-        newPosition.y += translation.y;
-
+        Vector3Int newPosition = position + (Vector3Int)translation;
         bool valid = board.IsValidPosition(this, newPosition);
 
-        if (valid)
+        if (valid && newPosition != position)
         {
             position = newPosition;
             lockTime = 0f;
+            return true;
         }
 
-        return valid;
+        return false;
     }
 }
