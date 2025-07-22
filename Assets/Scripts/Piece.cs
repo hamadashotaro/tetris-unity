@@ -9,6 +9,7 @@ public class Piece : MonoBehaviour
     public TetrominoData data { get; private set; }
     public Vector3Int[] cells { get; private set; }
     public int rotationIndex { get; private set; }
+    public bool hasPiece { get; private set; }
 
     public float stepDelay = 1f;
     public float lockDelay = 0.5f;
@@ -33,6 +34,7 @@ public class Piece : MonoBehaviour
     InputAction moveAction;
     InputAction hardDropAction;
     InputAction rotateAction;
+    InputAction holdAction;
 
     public void Initialize(Board board, Vector3Int position, TetrominoData data)
     {
@@ -45,6 +47,8 @@ public class Piece : MonoBehaviour
 
         arrSeconds = arrMs / 1000f;
         dasSeconds = dasMs / 1000f;
+        
+        hasPiece = true;
 
         if (cells == null)
             cells = new Vector3Int[data.cells.Length];
@@ -58,6 +62,7 @@ public class Piece : MonoBehaviour
         moveAction = InputSystem.actions.FindAction("Move");
         hardDropAction = InputSystem.actions.FindAction("HardDrop");
         rotateAction = InputSystem.actions.FindAction("Rotate");
+        holdAction = InputSystem.actions.FindAction("Hold");
     }
 
     private void Update()
@@ -135,7 +140,6 @@ public class Piece : MonoBehaviour
             }
         }
 
-
         if (hardDropAction.WasPressedThisFrame())
         {
             HardDrop();
@@ -149,6 +153,11 @@ public class Piece : MonoBehaviour
                 Rotate(1);
             else if (value is 2)
                 Rotate(-1);
+        }
+
+        if (holdAction.WasPressedThisFrame())
+        {
+            board.SwapPiece();
         }
 
         if (Time.time >= stepTime)

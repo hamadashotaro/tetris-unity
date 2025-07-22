@@ -683,6 +683,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   stepDelay: 1
   lockDelay: 0.5
+  arrMs: 33
+  dasMs: 183
+  arrSeconds: 0
+  dasSeconds: 0
 --- !u!114 &2130361839
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -711,6 +715,8 @@ MonoBehaviour:
   - tetromino: 6
     tile: {fileID: 11400000, guid: f523497a3aeb84eafbb2b1ee5eecd8b9, type: 2}
   spawnPosition: {x: -1, y: 8, z: 0}
+  previewPosition: {x: 7, y: 8, z: 0}
+  holdPosition: {x: -9, y: 8, z: 0}
   boardSize: {x: 10, y: 20}
 --- !u!156049354 &2130361840
 Grid:

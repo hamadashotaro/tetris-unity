@@ -42,4 +42,15 @@ public class TakenPieceArray
     {
         return size;
     }
+    
+    public override string ToString()
+    {
+        string result = "{";
+        for (int i = 0; i < size; i++)
+        {
+            result += arr[i] + ", ";
+        }
+        result += "}";
+        return result;
+    }
 }
